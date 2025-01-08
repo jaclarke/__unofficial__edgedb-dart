@@ -143,7 +143,8 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
   }
 
   Future<dynamic> _retryingFetch<T>(
-      {required String query,
+      {Language language = Language.edgeql,
+      required String query,
       String? queryName,
       dynamic args,
       required OutputFormat outputFormat,
@@ -155,6 +156,7 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
       final conn = await getConnection();
       try {
         result = await conn.fetch<T>(
+            language: language,
             query: query,
             queryName: queryName,
             args: args,
@@ -193,8 +195,26 @@ class ClientConnectionHolder<Connection extends BaseProtocol> {
         expectedCardinality: Cardinality.noResult);
   }
 
+  Future<void> executeSQL(String query, [dynamic args]) async {
+    await _retryingFetch(
+        language: Language.sql,
+        query: query,
+        args: args,
+        outputFormat: OutputFormat.none,
+        expectedCardinality: Cardinality.noResult);
+  }
+
   Future<List<dynamic>> query(String query, [dynamic args]) async {
     return await _retryingFetch(
+        query: query,
+        args: args,
+        outputFormat: OutputFormat.binary,
+        expectedCardinality: Cardinality.many) as List<dynamic>;
+  }
+
+  Future<List<dynamic>> querySQL(String query, [dynamic args]) async {
+    return await _retryingFetch(
+        language: Language.sql,
         query: query,
         args: args,
         outputFormat: OutputFormat.binary,
@@ -430,11 +450,23 @@ abstract class Executor {
   /// [docs page](../edgedb-library.html).
   Future<void> execute(String query, [dynamic args]);
 
+  /// Executes a SQL query, returning no result.
+  ///
+  /// For details on [args] see the `edgedb` library
+  /// [docs page](../edgedb-library.html).
+  Future<void> executeSQL(String query, [dynamic args]);
+
   /// Executes a query, returning a `List` of results.
   ///
   /// For details on result types and [args] see the `edgedb` library
   /// [docs page](../edgedb-library.html).
   Future<List<dynamic>> query(String query, [dynamic args]);
+
+  /// Executes a SQL query, returning a `List` of results.
+  ///
+  /// For details on result types and [args] see the `edgedb` library
+  /// [docs page](../edgedb-library.html).
+  Future<List<dynamic>> querySQL(String query, [dynamic args]);
 
   /// Executes a query, returning the result as a JSON encoded `String`.
   ///
@@ -690,10 +722,30 @@ class Client implements Executor {
   }
 
   @override
+  Future<void> executeSQL(String query, [dynamic args]) async {
+    final holder = await _pool.acquireHolder(_options);
+    try {
+      return await holder.executeSQL(query, args);
+    } finally {
+      await holder.release();
+    }
+  }
+
+  @override
   Future<List<dynamic>> query(String query, [dynamic args]) async {
     final holder = await _pool.acquireHolder(_options);
     try {
       return await holder.query(query, args);
+    } finally {
+      await holder.release();
+    }
+  }
+
+  @override
+  Future<List<dynamic>> querySQL(String query, [dynamic args]) async {
+    final holder = await _pool.acquireHolder(_options);
+    try {
+      return await holder.querySQL(query, args);
     } finally {
       await holder.release();
     }

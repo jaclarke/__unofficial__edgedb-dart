@@ -22,6 +22,14 @@ enum OutputFormat {
   const OutputFormat(this.value);
 }
 
+enum Language {
+  edgeql(0x45),
+  sql(0x53);
+
+  final int value;
+  const Language(this.value);
+}
+
 class ProtocolVersion {
   final int hi;
   final int lo;
@@ -42,3 +50,6 @@ class ProtocolVersion {
     return hi > other.hi;
   }
 }
+
+const protoV2 = ProtocolVersion(2, 0);
+const protoV3 = ProtocolVersion(3, 0);

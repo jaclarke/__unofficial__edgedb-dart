@@ -1488,4 +1488,107 @@ InvalidReferenceError: object type 'std::FreeObject' has no link or property 'ab
       await client.close();
     }
   });
+
+  if (getServerVersion() >= ServerVersion(6, 0)) {
+    test('querySQL', () async {
+      final client = getClient();
+
+      try {
+        expect(await client.querySQL("select 1"), [
+          {'col~1': 1}
+        ]);
+
+        expect(await client.querySQL("select 1 AS foo, 2 AS bar"), [
+          {'foo': 1, 'bar': 2}
+        ]);
+
+        expect(await client.querySQL(r'select 1 + $1::int8', [41]), [
+          {'col~1': 42}
+        ]);
+      } finally {
+        await client.close();
+      }
+    });
+
+    test("executeSQL", () async {
+      final client = getClient();
+
+      try {
+        // just test that it doesn't crash
+        await client.executeSQL("select 1");
+      } finally {
+        await client.close();
+      }
+    });
+
+    test("transaction SQL", () async {
+      final typename = "ExecuteSQL_01";
+      final query = 'SELECT $typename.prop1 LIMIT 1';
+      final client = getClient();
+
+      try {
+        await client.transaction((tx) async {
+          await tx.execute('''
+            CREATE TYPE $typename {
+              CREATE REQUIRED PROPERTY prop1 -> std::str;
+            };
+          ''');
+
+          await tx.executeSQL('INSERT INTO "$typename" (prop1) VALUES (123)');
+
+          expect(await tx.querySingle(query), '123');
+
+          expect(
+              await tx.querySQL('UPDATE "$typename" SET prop1 = \'345\''), []);
+
+          expect(await tx.querySingle(query), '345');
+
+          expect(
+              await tx.querySQL(
+                  'UPDATE "$typename" SET prop1 = \'567\' RETURNING prop1'),
+              [
+                {'prop1': '567'}
+              ]);
+
+          throw CancelTransaction();
+        });
+      } on CancelTransaction {
+        //
+      } finally {
+        await client.close();
+      }
+    });
+  } else {
+    test("SQL methods should fail nicely if proto v3 not supported", () async {
+      final client = getClient();
+
+      try {
+        await expectLater(
+            client.querySQL('select 1'),
+            throwsA(isA<UnsupportedFeatureError>().having(
+                (e) => e.message,
+                'message',
+                contains(
+                    'the server does not support SQL queries, upgrade to 6.0 or newer'))));
+
+        await expectLater(
+            client.executeSQL('select 1'),
+            throwsA(isA<UnsupportedFeatureError>().having(
+                (e) => e.message,
+                'message',
+                contains(
+                    'the server does not support SQL queries, upgrade to 6.0 or newer'))));
+
+        await expectLater(
+            client.transaction((tx) => tx.querySQL("select 1")),
+            throwsA(isA<UnsupportedFeatureError>().having(
+                (e) => e.message,
+                'message',
+                contains(
+                    'the server does not support SQL queries, upgrade to 6.0 or newer'))));
+      } finally {
+        await client.close();
+      }
+    });
+  }
 }

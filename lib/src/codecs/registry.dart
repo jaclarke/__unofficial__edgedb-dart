@@ -7,6 +7,7 @@ import '../primitives/types.dart';
 import 'codecs.dart';
 import 'consts.dart';
 import 'sparse_object.dart';
+import 'record.dart';
 
 const codecsCacheSize = 1000;
 const codecsBuildCacheSize = 200;
@@ -24,8 +25,7 @@ const ctypeRange = 9;
 const ctypeObject = 10;
 const ctypeCompound = 11;
 const ctypeMultiRange = 12;
-
-const protoV2 = ProtocolVersion(2, 0);
+const ctypeSqlRecord = 13;
 
 class CodecsRegistry {
   final codecsBuildCache = LRU<String, Codec>(capacity: codecsBuildCacheSize);
@@ -512,6 +512,33 @@ class CodecsRegistry {
           // Ignore
           frb.discard(frb.length);
           res = nullCodec;
+          break;
+        }
+
+      case ctypeSqlRecord:
+        {
+          final els = frb.readUint16();
+          final codecs = <Codec>[];
+          final names = <String>[];
+
+          for (var i = 0; i < els; i++) {
+            final name = frb.readString();
+
+            final pos = frb.readUint16();
+            Codec subCodec;
+            try {
+              subCodec = cl[pos];
+            } catch (e) {
+              throw ProtocolError(
+                  'could not build sql record codec: missing subcodec');
+            }
+
+            codecs.add(subCodec);
+            names.add(name);
+          }
+
+          res = SQLRecordCodec(tid, codecs, names);
+
           break;
         }
 

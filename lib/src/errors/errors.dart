@@ -214,6 +214,13 @@ class UnknownParameterError extends InvalidReferenceError {
   final code = 0x04030006;
 }
 
+class DeprecatedScopingError extends InvalidReferenceError {
+  DeprecatedScopingError(super.message, [super.source]);
+
+  @override
+  final code = 0x04030007;
+}
+
 class SchemaError extends QueryError {
   SchemaError(super.message, [super.source]);
 

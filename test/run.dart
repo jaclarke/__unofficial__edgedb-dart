@@ -111,7 +111,12 @@ class ServerInst {
 }
 
 Future<ServerInst> startServer(List<String> cmd, File statusFile) async {
-  final proc = await Process.start(cmd[0], cmd.sublist(1));
+  final proc = await Process.start(cmd[0], cmd.sublist(1),
+      environment: Platform.environment.containsKey('EDGEDB_SERVER_BIN') ||
+              Platform.environment.containsKey('CI')
+          ? {}
+          : {'__EDGEDB_DEVMODE': '1'},
+      includeParentEnvironment: true);
 
   if (Platform.environment['EDGEDB_DEBUG_SERVER'] != null) {
     print('starting server: ${cmd.join(' ')}');

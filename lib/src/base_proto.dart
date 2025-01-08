@@ -17,7 +17,7 @@ import 'primitives/transport.dart';
 import 'primitives/types.dart';
 import 'utils/indent.dart';
 
-const protoVer = ProtocolVersion(2, 0);
+const protoVer = protoV3;
 const minProtoVer = ProtocolVersion(1, 0);
 
 enum Capabilities {
@@ -242,8 +242,13 @@ abstract class BaseProtocol {
     final errorType = resolveErrorCode(errCode);
     final err = errorType(errMessage);
 
-    final attrs = message.readHeaders().map((key, value) => MapEntry(
-        errorAttrsByCode[key] ?? ErrorAttr.unknown, utf8.decode(value)));
+    var numAttrs = message.readInt16();
+    final attrs = <ErrorAttr, String>{};
+    while (numAttrs > 0) {
+      final key = message.readUint16();
+      attrs[errorAttrsByCode[key] ?? ErrorAttr.unknown] = message.readString();
+      numAttrs--;
+    }
     setErrorAttrs(err, attrs);
 
     message.finishMessage();
@@ -340,6 +345,7 @@ abstract class BaseProtocol {
 
   void _encodeParseParams(
       {required WriteMessageBuffer buffer,
+      required Language language,
       required String query,
       required OutputFormat outputFormat,
       required Cardinality expectedCardinality,
@@ -351,7 +357,11 @@ abstract class BaseProtocol {
       ..writeFlags(
           privilegedMode ? Capabilities.all.value : restrictedCapabilities)
       ..writeFlags(0)
-      ..writeInt64(0)
+      ..writeInt64(0);
+    if (protocolVersion >= protoV3) {
+      buffer.writeUint8(language.value);
+    }
+    buffer
       ..writeUint8(outputFormat.value)
       ..writeUint8(expectedCardinality == Cardinality.one ||
               expectedCardinality == Cardinality.atMostOne
@@ -381,7 +391,8 @@ abstract class BaseProtocol {
   // protocol flow
 
   Future<dynamic> fetch<T>(
-      {required String query,
+      {Language language = Language.edgeql,
+      required String query,
       String? queryName,
       dynamic args,
       required OutputFormat outputFormat,
@@ -390,6 +401,12 @@ abstract class BaseProtocol {
       Codec? inCodec,
       Codec? outCodec,
       bool privilegedMode = false}) async {
+    if (language != Language.edgeql && protoV3 > protocolVersion) {
+      throw UnsupportedFeatureError(
+        'the server does not support SQL queries, upgrade to 6.0 or newer',
+      );
+    }
+
     final requiredOne = expectedCardinality == Cardinality.one;
     final expectOne =
         requiredOne || expectedCardinality == Cardinality.atMostOne;
@@ -404,6 +421,7 @@ abstract class BaseProtocol {
     if ((inCodec == null && cacheItem == null && args != null) ||
         (stateCodec == invalidCodec && state != Session.defaults())) {
       parseResult = await parse(
+          language: language,
           query: query,
           outputFormat: outputFormat,
           expectedCardinality: expectedCardinality,
@@ -412,6 +430,7 @@ abstract class BaseProtocol {
     }
     try {
       await execute(
+          language: language,
           query: query,
           queryName: queryName,
           args: args,
@@ -442,6 +461,7 @@ abstract class BaseProtocol {
         }
       }
       await execute(
+          language: language,
           query: query,
           queryName: queryName,
           args: args,
@@ -482,6 +502,7 @@ abstract class BaseProtocol {
   }
 
   Future<ParseResult> parse({
+    required Language language,
     required String query,
     required OutputFormat outputFormat,
     required Cardinality expectedCardinality,
@@ -496,6 +517,7 @@ abstract class BaseProtocol {
 
     _encodeParseParams(
         buffer: wb,
+        language: language,
         query: query,
         outputFormat: outputFormat,
         expectedCardinality: expectedCardinality,
@@ -557,6 +579,7 @@ abstract class BaseProtocol {
     if (error != null) {
       if (error is StateMismatchError) {
         return parse(
+            language: language,
             query: query,
             outputFormat: outputFormat,
             expectedCardinality: expectedCardinality,
@@ -570,6 +593,7 @@ abstract class BaseProtocol {
   }
 
   Future<void> execute({
+    required Language language,
     required String query,
     String? queryName,
     dynamic args,
@@ -590,6 +614,7 @@ abstract class BaseProtocol {
 
     _encodeParseParams(
         buffer: wb,
+        language: language,
         query: query,
         outputFormat: outputFormat,
         expectedCardinality: expectedCardinality,
@@ -691,6 +716,7 @@ abstract class BaseProtocol {
     if (error != null) {
       if (error is StateMismatchError) {
         return execute(
+          language: language,
           query: query,
           queryName: queryName,
           args: args,

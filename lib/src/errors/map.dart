@@ -33,6 +33,7 @@ final errorMapping = {
   0x04030004: UnknownUserError.new,
   0x04030005: UnknownDatabaseError.new,
   0x04030006: UnknownParameterError.new,
+  0x04030007: DeprecatedScopingError.new,
   0x04040000: SchemaError.new,
   0x04050000: SchemaDefinitionError.new,
   0x04050100: InvalidDefinitionError.new,
