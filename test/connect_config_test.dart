@@ -25,8 +25,20 @@ void main() {
           'Try running "git submodule update --init".');
     }
 
+    Map<String, dynamic> exceptions = {};
+
     for (var testcase in connectionTestcases) {
-      await runConnectionTest(testcase);
+      try {
+        await runConnectionTest(testcase);
+      } catch (err) {
+        exceptions[testcase['name']] = err;
+      }
+    }
+
+    if (exceptions.isNotEmpty) {
+      throw Exception('''${exceptions.length} connection testcases failed:
+
+${exceptions.entries.map((e) => '--- ${e.key} ---\n${e.value}').join('\n\n')}''');
     }
   });
 
