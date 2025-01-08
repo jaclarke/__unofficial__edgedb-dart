@@ -149,6 +149,24 @@ Executes a query, returning no result.
 For details on ``args`` see the ``edgedb`` library
 `docs page <https://pub.dev/documentation/edgedb/latest/edgedb-library.html>`__.
 
+.. _edgedb-dart-Client-executeSQL:
+
+*method* ``.executeSQL()``
+..........................
+
+
+.. code-block:: dart
+
+    Future<void> executeSQL( 
+      String query, [
+      dynamic args]
+    )
+
+Executes a SQL query, returning no result.
+
+For details on ``args`` see the ``edgedb`` library
+`docs page <https://pub.dev/documentation/edgedb/latest/edgedb-library.html>`__.
+
 .. _edgedb-dart-Client-query:
 
 *method* ``.query()``
@@ -227,6 +245,24 @@ than one element, a `ResultCardinalityMismatchError <https://pub.dev/documentati
 If the query returns an empty set, a `NoDataError <https://pub.dev/documentation/edgedb/latest/edgedb/NoDataError-class.html>`__ error is thrown.
 
 For details on ``args`` see the ``edgedb`` library
+`docs page <https://pub.dev/documentation/edgedb/latest/edgedb-library.html>`__.
+
+.. _edgedb-dart-Client-querySQL:
+
+*method* ``.querySQL()``
+........................
+
+
+.. code-block:: dart
+
+    Future<List> querySQL( 
+      String query, [
+      dynamic args]
+    )
+
+Executes a SQL query, returning a ``List`` of results.
+
+For details on result types and ``args`` see the ``edgedb`` library
 `docs page <https://pub.dev/documentation/edgedb/latest/edgedb-library.html>`__.
 
 .. _edgedb-dart-Client-querySingle:
