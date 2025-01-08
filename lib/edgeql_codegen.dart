@@ -71,6 +71,7 @@
 import 'package:build/build.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:dart_style/dart_style.dart';
+import 'package:pub_semver/pub_semver.dart';
 import 'package:edgedb/src/base_proto.dart';
 import 'package:edgedb/src/client.dart';
 import 'package:edgedb/src/codecs/codecs.dart';
@@ -107,6 +108,7 @@ class EdgeqlCodegenBuilder implements Builder {
     final holder = await connPool.acquireHolder(Options.defaults());
     try {
       parseResult = await (await holder.getConnection()).parse(
+          language: Language.edgeql,
           query: query,
           outputFormat: OutputFormat.binary,
           expectedCardinality: Cardinality.many,
@@ -228,10 +230,11 @@ class EdgeqlCodegenBuilder implements Builder {
                   .statement;
       }))));
 
-    final generatedCode = DartFormatter().format(file
-        .build()
-        .accept(DartEmitter.scoped(useNullSafetySyntax: true))
-        .toString());
+    final generatedCode = DartFormatter(languageVersion: Version(3, 6, 0))
+        .format(file
+            .build()
+            .accept(DartEmitter.scoped(useNullSafetySyntax: true))
+            .toString());
 
     await buildStep.writeAsString(
         inputId.addExtension('.dart'),

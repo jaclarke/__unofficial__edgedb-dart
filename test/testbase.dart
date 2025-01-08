@@ -35,6 +35,13 @@ class ServerVersion {
         minor == other.minor;
   }
 
+  bool operator >=(ServerVersion other) {
+    if (major == other.major) {
+      return minor >= other.minor;
+    }
+    return major > other.major;
+  }
+
   @override
   int get hashCode => Object.hash(major, minor);
 

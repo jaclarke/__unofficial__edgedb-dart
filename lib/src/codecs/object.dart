@@ -34,7 +34,8 @@ class ObjectCodec extends Codec {
   }
 
   void encodeArgs(WriteBuffer buf, dynamic args) {
-    if (fields[0].name == '0') {
+    // EdgeQL query parameters start at 0, SQL start at 1.
+    if (fields[0].name == "0" || fields[0].name == "1") {
       _encodePositionalArgs(buf, args);
     } else {
       _encodeNamedArgs(buf, args);
