@@ -250,26 +250,26 @@ class ResolvedConnectConfig {
             'invalid tlsSecurity value, must be of type TLSSecurity');
       }
       final origTlsSec = tlsSec;
-      final clientSecurity = getEnvVar('EDGEDB_CLIENT_SECURITY');
-      if (clientSecurity != null) {
+      final clientSecurity = getPrefixedEnvVar('CLIENT_SECURITY');
+      if (clientSecurity.value != null) {
         if (!{'default', 'insecure_dev_mode', 'strict'}
-            .contains(clientSecurity)) {
+            .contains(clientSecurity.value)) {
           throw InterfaceError(
-              "invalid EDGEDB_CLIENT_SECURITY value: '$clientSecurity', "
+              "invalid ${clientSecurity.source} value: '$clientSecurity', "
               "must be one of 'default', 'insecure_dev_mode' or 'strict'");
         }
-        if (clientSecurity == 'insecure_dev_mode') {
+        if (clientSecurity.value == 'insecure_dev_mode') {
           if (tlsSec == TLSSecurity.defaultSecurity) {
             tlsSec = TLSSecurity.insecure;
           }
-        } else if (clientSecurity == 'strict') {
+        } else if (clientSecurity.value == 'strict') {
           if (tlsSec == TLSSecurity.insecure ||
               tlsSec == TLSSecurity.noHostVerification) {
             throw InterfaceError(
                 "'tlsSecurity' value (${tlsSec.value}) conflicts with "
-                "EDGEDB_CLIENT_SECURITY value ($clientSecurity), "
+                "${clientSecurity.source} value ($clientSecurity), "
                 "'tlsSecurity' value cannot be lower than security level "
-                "set by EDGEDB_CLIENT_SECURITY");
+                "set by ${clientSecurity.source}");
           }
           tlsSec = TLSSecurity.strict;
         }
@@ -278,7 +278,7 @@ class ResolvedConnectConfig {
           tlsSec,
           '${tlsSecurity.source}'
           '${tlsSec != origTlsSec ? " (modified from '${origTlsSec.value}' "
-              "by EDGEDB_CLIENT_SECURITY env var)" : ''}');
+              "by ${clientSecurity.source} env var)" : ''}');
     }
   }
 
@@ -513,6 +513,19 @@ int parseDuration(dynamic rawDuration) {
   return duration;
 }
 
+SourcedValue<String?> getPrefixedEnvVar(String key) {
+  final val = getEnvVar('GEL_$key');
+  final oldVal = getEnvVar('EDGEDB_$key');
+  return SourcedValue(val ?? oldVal,
+      '${val == null && oldVal != null ? 'EDGEDB' : 'GEL'}_$key');
+}
+
+SourcedValue<String?> getSourcedEnvVar(String key) {
+  final envVar = getPrefixedEnvVar(key);
+  envVar.source = "'${envVar.source}' environment variable";
+  return envVar;
+}
+
 Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
   final resolvedConfig = ResolvedConnectConfig();
 
@@ -547,8 +560,7 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
     user: SourcedValue(config.user, "'user' option"),
     password: SourcedValue(config.password, "'password' option"),
     secretKey: SourcedValue(config.secretKey, "'secretKey' option"),
-    cloudProfile: SourcedValue(getEnvVar('EDGEDB_CLOUD_PROFILE'),
-        "'EDGEDB_CLOUD_PROFILE' environment variable"),
+    cloudProfile: getSourcedEnvVar('CLOUD_PROFILE'),
     tlsCA: SourcedValue(config.tlsCA, "'tlsCA' option"),
     tlsCAFile: SourcedValue(config.tlsCAFile, "'tlsCAFile' option"),
     tlsSecurity: SourcedValue(config.tlsSecurity, "'tlsSecurity' option"),
@@ -560,50 +572,37 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
   if (!hasCompoundOptions) {
     // resolve config from env vars
 
-    var port = getEnvVar('EDGEDB_PORT');
+    final port = getSourcedEnvVar('PORT');
+    final portVal = port.value;
     if (resolvedConfig._port == null &&
-        port != null &&
-        port.startsWith('tcp://')) {
+        portVal != null &&
+        portVal.startsWith('tcp://')) {
       // EDGEDB_PORT is set by 'docker --link' so ignore and warn
       log('EDGEDB_PORT in \'tcp://host:port\' format, so will be ignored');
-      port = null;
+      port.value = null;
     }
 
     hasCompoundOptions = await resolveConfigOptions(
       resolvedConfig,
       "Cannot have more than one of the following connection environment variables: "
-      "'EDGEDB_DSN', 'EDGEDB_INSTANCE', 'EDGEDB_CREDENTIALS', "
-      "'EDGEDB_CREDENTIALS_FILE' or 'EDGEDB_HOST'",
+      "'GEL_DSN', 'GEL_INSTANCE', 'GEL_CREDENTIALS', "
+      "'GEL_CREDENTIALS_FILE' or 'GEL_HOST'",
       null,
-      dsn: SourcedValue(
-          getEnvVar('EDGEDB_DSN'), "'EDGEDB_DSN' environment variable"),
-      instanceName: SourcedValue(getEnvVar('EDGEDB_INSTANCE'),
-          "'EDGEDB_INSTANCE' environment variable"),
-      credentials: SourcedValue(getEnvVar('EDGEDB_CREDENTIALS'),
-          "'EDGEDB_CREDENTIALS' environment variable"),
-      credentialsFile: SourcedValue(getEnvVar('EDGEDB_CREDENTIALS_FILE'),
-          "'EDGEDB_CREDENTIALS_FILE' environment variable"),
-      host: SourcedValue(
-          getEnvVar('EDGEDB_HOST'), "'EDGEDB_HOST' environment variable"),
-      port: SourcedValue(port, "'EDGEDB_PORT' environment variable"),
-      database: SourcedValue(getEnvVar('EDGEDB_DATABASE'),
-          "'EDGEDB_DATABASE' environment variable"),
-      branch: SourcedValue(
-          getEnvVar('EDGEDB_BRANCH'), "'EDGEDB_BRANCH' environment variable"),
-      user: SourcedValue(
-          getEnvVar('EDGEDB_USER'), "'EDGEDB_USER' environment variable"),
-      password: SourcedValue(getEnvVar('EDGEDB_PASSWORD'),
-          "'EDGEDB_PASSWORD' environment variable"),
-      secretKey: SourcedValue(getEnvVar('EDGEDB_SECRET_KEY'),
-          "'EDGEDB_SECRET_KEY' environment variable"),
-      tlsCA: SourcedValue(
-          getEnvVar('EDGEDB_TLS_CA'), "'EDGEDB_TLS_CA' environment variable"),
-      tlsCAFile: SourcedValue(getEnvVar('EDGEDB_TLS_CA_FILE'),
-          "'EDGEDB_TLS_CA_FILE' environment variable"),
-      tlsSecurity: SourcedValue(getEnvVar('EDGEDB_CLIENT_TLS_SECURITY'),
-          "'EDGEDB_CLIENT_TLS_SECURITY' environment variable"),
-      waitUntilAvailable: SourcedValue(getEnvVar('EDGEDB_WAIT_UNTIL_AVAILABLE'),
-          "'EDGEDB_WAIT_UNTIL_AVAILABLE' environment variable"),
+      dsn: getSourcedEnvVar('DSN'),
+      instanceName: getSourcedEnvVar('INSTANCE'),
+      credentials: getSourcedEnvVar('CREDENTIALS'),
+      credentialsFile: getSourcedEnvVar('CREDENTIALS_FILE'),
+      host: getSourcedEnvVar('HOST'),
+      port: port,
+      database: getSourcedEnvVar('DATABASE'),
+      branch: getSourcedEnvVar('BRANCH'),
+      user: getSourcedEnvVar('USER'),
+      password: getSourcedEnvVar('PASSWORD'),
+      secretKey: getSourcedEnvVar('SECRET_KEY'),
+      tlsCA: getSourcedEnvVar('TLS_CA'),
+      tlsCAFile: getSourcedEnvVar('TLS_CA_FILE'),
+      tlsSecurity: getSourcedEnvVar('CLIENT_TLS_SECURITY'),
+      waitUntilAvailable: getSourcedEnvVar('WAIT_UNTIL_AVAILABLE'),
     );
   }
 
@@ -614,8 +613,8 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
       throw ClientConnectionError(
           "no 'edgedb.toml' found and no connection options specified"
           " either via arguments to `connect()` API or via environment"
-          " variables EDGEDB_HOST, EDGEDB_INSTANCE, EDGEDB_DSN, "
-          "EDGEDB_CREDENTIALS or EDGEDB_CREDENTIALS_FILE");
+          " variables GEL_HOST, GEL_INSTANCE, GEL_DSN, "
+          "GEL_CREDENTIALS or GEL_CREDENTIALS_FILE");
     }
     final stashPath = await getStashPath(projectDir);
     final instancePath =
@@ -642,7 +641,7 @@ Future<ResolvedConnectConfig> parseConnectConfig(ConnectConfig config) async {
     } else {
       throw ClientConnectionError(
           "Found 'edgedb.toml' but the project is not initialized. "
-          "Run `edgedb project init`.");
+          "Run `gel project init`.");
     }
   }
 
@@ -732,7 +731,7 @@ Future<bool> resolveConfigOptions(ResolvedConnectConfig resolvedConfig,
         }
         final validHost = host?.value != null ? validateHost(host!.value!) : '';
         resolvedDsn = SourcedValue(
-            'edgedb://${validHost.contains(':') ? '[${Uri.encodeFull(validHost)}]' : validHost}',
+            'gel://${validHost.contains(':') ? '[${Uri.encodeFull(validHost)}]' : validHost}',
             host?.value != null ? host!.source : port!.source);
       } else {
         resolvedDsn = SourcedValue.from(dsn!);
