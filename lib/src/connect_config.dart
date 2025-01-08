@@ -751,7 +751,7 @@ Future<bool> resolveConfigOptions(ResolvedConnectConfig resolvedConfig,
             source = instanceName.source;
           } else {
             if (!RegExp(
-                    r'^([A-Za-z0-9](-?[A-Za-z0-9])*)/([A-Za-z0-9](-?[A-Za-z0-9])*)$')
+                    r'^([A-Za-z0-9_-](-?[A-Za-z0-9_])*)/([A-Za-z0-9](-?[A-Za-z0-9])*)$')
                 .hasMatch(instanceName.value!)) {
               throw InterfaceError(
                   "invalid DSN or instance name: '${instanceName.value}'");
